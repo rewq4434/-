@@ -1,0 +1,8 @@
+node_modules/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/src/main/assets/public/
+icon-1024.png
+*.zip

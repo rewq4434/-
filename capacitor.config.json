@@ -1,0 +1,7 @@
+{
+  "appId": "com.omok.online",
+  "appName": "온라인 오목",
+  "webDir": "public",
+  "server": { "androidScheme": "http", "cleartext": true },
+  "android": { "allowMixedContent": true }
+}

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2b2420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="오목">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>온라인 오목</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="lobby" class="screen">
+  <h1>⚫ 온라인 오목 ⚪</h1>
+  <div id="serverRow" class="row hidden">
+    <input id="serverInput" placeholder="받은 초대 메시지 붙여넣기 (선택)" inputmode="url" autocapitalize="off">
+    <button id="serverBtn">연결</button>
+  </div>
+  <input id="name" placeholder="닉네임" maxlength="12">
+  <div id="inviteBox" class="invite hidden">
+    <div>🎉 친구가 오목 대결에 초대했어요!</div>
+    <div class="muted">방 코드 <b id="inviteCode"></b></div>
+    <button id="inviteBtn" class="primary big">바로 입장하기</button>
+  </div>
+  <button id="createBtn" class="primary">친구와 하기 (방 만들기)</button>
+  <button id="quickBtn">아무나와 빠른 대전</button>
+  <div class="row">
+    <input id="codeInput" placeholder="방 코드" maxlength="5">
+    <button id="joinBtn">입장</button>
+  </div>
+  <p id="lobbyMsg" class="msg"></p>
+  <button id="installBtn" class="hidden">📲 홈 화면에 앱으로 설치</button>
+  <a id="apkLink" class="apk hidden" href="omok.apk" download>🤖 안드로이드 앱(APK) 받기</a>
+  <p id="iosHint" class="muted hidden">아이폰: 사파리 공유 버튼 → "홈 화면에 추가"를 누르면 앱처럼 쓸 수 있어요.</p>
+</div>
+
+<div id="game" class="screen hidden">
+  <div class="top">
+    <div>방 코드: <b id="roomCode"></b> <button id="copyBtn" class="small">링크 복사</button></div>
+    <button id="leaveBtn" class="small">나가기</button>
+  </div>
+  <div class="players">
+    <div id="p1" class="player"><span class="stone b"></span><span class="pname">대기 중…</span></div>
+    <div id="status">상대를 기다리는 중…</div>
+    <div id="p2" class="player"><span class="stone w"></span><span class="pname">대기 중…</span></div>
+  </div>
+  <div class="main">
+    <canvas id="board"></canvas>
+    <div class="side">
+      <div class="buttons">
+        <button id="undoBtn">무르기 요청</button>
+        <button id="resignBtn">기권</button>
+        <button id="rematchBtn" class="primary hidden">다시 하기</button>
+      </div>
+      <div id="spec" class="muted"></div>
+      <div id="chatLog"></div>
+      <form id="chatForm"><input id="chatInput" placeholder="채팅…" autocomplete="off"><button>전송</button></form>
+    </div>
+  </div>
+</div>
+<script src="config.js"></script>
+<script src="peerjs.min.js"></script>
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

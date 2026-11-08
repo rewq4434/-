@@ -1,0 +1,70 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #2b2420; color: #f3ede6; min-height: 100vh; }
+.hidden { display: none !important; }
+button, input { font: inherit; border-radius: 8px; border: 1px solid #6b5a4c; padding: 10px 14px; }
+input { background: #1d1815; color: #f3ede6; }
+button { background: #4a3d33; color: #f3ede6; cursor: pointer; }
+button:hover { background: #5c4c3f; }
+button.primary { background: #d9a441; color: #2b2420; border-color: #d9a441; font-weight: 700; }
+button.primary:hover { background: #e8b655; }
+button.small { padding: 4px 10px; font-size: 13px; }
+button:disabled { opacity: .4; cursor: default; }
+
+#lobby { max-width: 340px; margin: 12vh auto; display: flex; flex-direction: column; gap: 12px; text-align: center; padding: 0 16px; }
+#lobby h1 { margin-bottom: 16px; }
+.row { display: flex; gap: 8px; }
+.row input { flex: 1; min-width: 0; text-transform: uppercase; }
+.msg { color: #ff8a7a; min-height: 1.2em; }
+
+#game { max-width: 1000px; margin: 0 auto; padding: 12px; }
+.top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.players { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.player { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: #3a302a; border: 2px solid transparent; min-width: 120px; }
+.player.turn { border-color: #d9a441; box-shadow: 0 0 12px #d9a44177; }
+.player.me .pname::after { content: ' (나)'; color: #d9a441; }
+#p2 { justify-content: flex-end; }
+#status { font-weight: 700; text-align: center; flex: 1; }
+.stone { width: 18px; height: 18px; border-radius: 50%; display: inline-block; }
+.stone.b { background: radial-gradient(circle at 35% 35%, #666, #000); }
+.stone.w { background: radial-gradient(circle at 35% 35%, #fff, #bbb); }
+
+.main { display: flex; gap: 16px; align-items: flex-start; }
+canvas { width: min(640px, 100%); aspect-ratio: 1; border-radius: 6px; box-shadow: 0 6px 24px #0008; cursor: pointer; touch-action: manipulation; }
+.side { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 240px; }
+.buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.muted { color: #a8998b; font-size: 13px; }
+#chatLog { height: 360px; overflow-y: auto; background: #1d1815; border-radius: 8px; padding: 8px; font-size: 14px; }
+#chatLog div { margin: 3px 0; word-break: break-all; }
+#chatLog .info { color: #a8998b; font-style: italic; }
+#chatForm { display: flex; gap: 6px; }
+#chatForm input { flex: 1; min-width: 0; }
+
+@media (max-width: 760px) {
+  .main { flex-direction: column; }
+  .side { width: 100%; }
+  #chatLog { height: 160px; }
+  .player { min-width: 0; }
+}
+
+/* ---- 모바일 / 앱 ---- */
+html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); -webkit-user-select: none; user-select: none; }
+input { -webkit-user-select: text; user-select: text; font-size: 16px; } /* iOS 자동 확대 방지 */
+canvas { touch-action: none; }
+@media (max-width: 760px) {
+  #game { padding: 8px; }
+  #lobby { margin-top: 8vh; }
+  .top { font-size: 14px; }
+  .players { font-size: 14px; gap: 4px; }
+  .player { padding: 6px 8px; max-width: 34%; overflow: hidden; white-space: nowrap; }
+  #status { font-size: 14px; }
+  canvas { width: 100%; }
+  .buttons button { flex: 1; padding: 12px 6px; }
+}
+#serverInput { text-transform: none; }
+
+.invite { background: #3a302a; border: 2px solid #d9a441; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.invite .muted b { color: #f3ede6; letter-spacing: 2px; }
+button.big { padding: 14px; font-size: 18px; }
+#chatLog .hint { color: #d9a441; }
+.apk { color: #d9a441; font-size: 14px; }
