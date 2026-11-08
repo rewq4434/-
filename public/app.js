@@ -96,92 +96,160 @@ function connect() {
   };
 }
 
-// ───────── p2p 모드 (PeerJS / WebRTC) ─────────
-const PEER_PREFIX = 'omok-rewq4434-v1-';
-let peer = null, hostConn = null, core = null, localConn = null;
+// ───────── p2p 모드 (서버 없이: 공개 MQTT 중계 서버로 메시지만 주고받음) ─────────
+// 방장 기기가 게임 규칙(core.js)을 실행하고, 중계 서버는 메시지를 전달만 함.
+// WebRTC 직접 연결을 쓰지 않으므로 LTE/5G·회사 와이파이 등 어떤 네트워크에서도 동작.
+const BROKERS = window.OMOK_BROKERS || [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://test.mosquitto.org:8081/mqtt',
+];
+const TOPIC = 'omok-rewq4434/v2/';
+const myId = (localStorage.getItem('omokId') || (() => {
+  const id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  localStorage.setItem('omokId', id); return id;
+})());
+const DEAD_MS = 90000; // 이 시간 동안 소식이 없으면 연결 끊김으로 판단 (카톡 다녀오는 시간 여유)
+let mq = null, core = null, localConn = null, roomBase = '', hbTimer = null, hostSeen = 0, myToken = 0;
+const clients = new Map();
 
 function p2pReset() {
-  const p = peer;
-  peer = null; hostConn = null; core = null; localConn = null;
-  if (p) setTimeout(() => p.destroy(), 300); // 마지막 메시지가 전달될 시간
+  myToken++;
+  clearInterval(hbTimer); hbTimer = null;
+  const c = mq;
+  if (c) {
+    try { c.publish(roomBase + (core ? '/down' : '/up'), JSON.stringify(core ? { t: 'closed' } : { from: myId, t: 'bye' }), { qos: 1 }); } catch (e) {}
+    setTimeout(() => c.end(false), 500); // 마지막 메시지가 전달될 시간
+  }
+  mq = null; core = null; localConn = null; roomBase = ''; clients.clear();
 }
 function p2pMsg(text) {
   if ($('game').classList.contains('hidden')) $('lobbyMsg').textContent = text; else log('⚠ ' + text);
 }
-function p2pError(e) {
-  const t = e && e.type;
-  if (t === 'peer-unavailable') p2pMsg('방을 찾을 수 없어요. 방장이 나갔거나 코드가 틀렸어요.');
-  else if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') {
-    if (!$('game').classList.contains('hidden')) return; // 대국 중이면 이미 연결된 상대와는 계속 통신됨
-    p2pMsg('연결 서버에 접속할 수 없어요. 인터넷 연결을 확인하세요.');
-  } else if (t === 'browser-incompatible') p2pMsg('이 브라우저는 지원하지 않아요. 크롬이나 사파리를 써 주세요.');
-  else p2pMsg('연결 오류: ' + ((e && e.message) || t));
-}
-function newPeer(id) {
-  const o = Object.assign({ debug: 0 }, window.OMOK_PEER || {}); // 중계 서버를 바꾸려면 config.js에서 OMOK_PEER 지정
-  const p = id ? new Peer(id, o) : new Peer(o);
-  // 카톡으로 초대 링크를 보내느라 화면을 벗어났다 돌아오면 중계 서버에 다시 등록
-  p.on('disconnected', () => setTimeout(() => { if (p === peer && !p.destroyed && p.disconnected) p.reconnect(); }, 1000));
-  return p;
-}
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && peer && !peer.destroyed && peer.disconnected) peer.reconnect();
-});
 function randomCode() {
   const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let c = ''; for (let i = 0; i < 5; i++) c += A[Math.floor(Math.random() * A.length)];
   return c;
 }
-
-function p2pHost(nm) {
-  p2pReset();
-  const code = randomCode();
-  $('lobbyMsg').textContent = '방을 만드는 중…';
-  const p = peer = newPeer(PEER_PREFIX + code);
-  p.on('open', () => {
-    if (p !== peer) return;
-    $('lobbyMsg').textContent = '';
-    core = OmokCore.createGame({ allowCode: true });
-    localConn = { send: m => setTimeout(() => handle(m)) };
-    core.connect(localConn);
-    core.message(localConn, { type: 'create', name: nm, code });
-  });
-  p.on('connection', dc => {
-    const c = { send: m => { if (dc.open) dc.send(m); } };
-    let joined = false;
-    dc.on('open', () => { if (core) { core.connect(c); joined = true; } });
-    dc.on('data', d => { if (core && joined && p === peer) core.message(c, d); });
-    const bye = () => { if (core && joined && p === peer) { joined = false; core.close(c); } };
-    dc.on('close', bye); dc.on('error', bye);
-  });
-  p.on('error', e => {
-    if (p !== peer) return;
-    if (e.type === 'unavailable-id') return p2pHost(nm); // 코드 겹침 → 새 코드로
-    p2pError(e);
-  });
-}
-
-function p2pJoin(nm, code) {
-  p2pReset();
-  $('lobbyMsg').textContent = '방에 연결 중…';
-  const p = peer = newPeer();
-  p.on('open', () => {
-    if (p !== peer) return;
-    const dc = hostConn = p.connect(PEER_PREFIX + code, { serialization: 'json', reliable: true });
-    const slow = setTimeout(() => {
-      if (!dc.open && dc === hostConn) $('lobbyMsg').textContent = '연결이 오래 걸리고 있어요… 잠시만 기다려 주세요.';
-    }, 8000);
-    dc.on('open', () => { clearTimeout(slow); $('lobbyMsg').textContent = ''; dc.send({ type: 'join', name: nm, code }); });
-    dc.on('data', handle);
-    dc.on('close', () => {
-      if (dc !== hostConn) return; // 내가 나간 경우
-      showLobby();
-      $('lobbyMsg').textContent = '방장과의 연결이 끊어졌어요.';
-      p2pReset();
+// 중계 서버 하나에 접속 (실패/시간초과면 reject)
+function brokerConnect(url) {
+  return new Promise((resolve, reject) => {
+    const c = mqtt.connect(url, {
+      clientId: 'omok_' + myId + '_' + Math.random().toString(36).slice(2, 6),
+      clean: false, connectTimeout: 7000, reconnectPeriod: 2000, keepalive: 30, protocolVersion: 4,
     });
+    let done = false;
+    const fail = () => { if (!done) { done = true; c.end(true); reject(); } };
+    c.once('connect', () => { if (!done) { done = true; resolve(c); } });
+    c.on('error', () => {});
+    c.once('close', fail); // 접속 실패하면 바로 다음 중계 서버로
+    c.once('offline', fail);
+    setTimeout(fail, 7000);
   });
-  p.on('error', e => { if (p === peer) p2pError(e); });
 }
+const pub = (c, topic, obj) => c.publish(topic, JSON.stringify(obj), { qos: 1 });
+const parse = buf => { try { return JSON.parse(buf.toString()); } catch (e) { return null; } };
+
+async function p2pHost(nm) {
+  p2pReset();
+  const token = myToken, code = randomCode(), base = TOPIC + code;
+  $('lobbyMsg').textContent = '방을 만드는 중…';
+  let c = null;
+  for (const url of BROKERS) {
+    try { c = await brokerConnect(url); break; } catch (e) {}
+    if (token !== myToken) return;
+  }
+  if (token !== myToken) { if (c) c.end(true); return; }
+  if (!c) { $('lobbyMsg').textContent = '중계 서버에 접속할 수 없어요. 인터넷 연결을 확인하고 다시 시도해 주세요.'; return; }
+  mq = c; roomBase = base;
+  $('lobbyMsg').textContent = '';
+  core = OmokCore.createGame({ allowCode: true });
+  localConn = { send: m => setTimeout(() => handle(m)) };
+  core.connect(localConn);
+  core.message(localConn, { type: 'create', name: nm, code });
+  c.subscribe(base + '/up', { qos: 1 });
+  c.on('message', (topic, buf) => {
+    if (c !== mq) return;
+    const d = parse(buf); if (!d || !d.from) return;
+    const id = String(d.from);
+    let cl = clients.get(id);
+    if (d.t === 'bye') { if (cl) { clients.delete(id); core.close(cl.conn); } return; }
+    if (d.t === 'ping') {
+      if (cl) cl.seen = Date.now(); else pub(c, base + '/to/' + id, { t: 'gone' }); // 모르는 사람 → 다시 입장하라고 알림
+      return;
+    }
+    if (d.t !== 'm' || !d.m) return;
+    if (!cl) {
+      if (d.m.type !== 'join') return pub(c, base + '/to/' + id, { t: 'gone' });
+      cl = { conn: { send: m => pub(c, base + '/to/' + id, { t: 'm', m }) }, seen: 0 };
+      core.connect(cl.conn); clients.set(id, cl);
+    }
+    cl.seen = Date.now();
+    core.message(cl.conn, d.m);
+  });
+  hbTimer = setInterval(() => {
+    if (c !== mq) return;
+    const now = Date.now();
+    for (const [id, cl] of clients) if (now - cl.seen > DEAD_MS) { clients.delete(id); core.close(cl.conn); }
+    if (clients.size) pub(c, base + '/down', { t: 'alive' });
+  }, 5000);
+}
+
+async function p2pJoin(nm, code) {
+  p2pReset();
+  const token = myToken, base = TOPIC + code;
+  $('lobbyMsg').textContent = '방에 연결 중…';
+  for (const url of BROKERS) { // 방장이 어느 중계 서버에 있는지 차례로 찾아봄
+    let c;
+    try { c = await brokerConnect(url); } catch (e) { if (token !== myToken) return; continue; }
+    if (token !== myToken) { c.end(true); return; }
+    const pending = [];
+    const process = d => {
+      hostSeen = Date.now();
+      if (d.t === 'm') handle(d.m);
+      else if (d.t === 'closed' || d.t === 'gone') hostLost(d.t === 'closed' ? '방장이 방을 닫았어요.' : '방장과의 연결이 끊어졌어요.');
+    };
+    const found = await new Promise(resolve => {
+      let got = false;
+      c.on('message', (topic, buf) => {
+        const d = parse(buf); if (!d) return;
+        if (!got) { if (d.t !== 'm') return; got = true; resolve(true); }
+        if (c !== mq) { if (!mq || mq === null) pending.push(d); return; }
+        process(d);
+      });
+      c.subscribe([base + '/to/' + myId, base + '/down'], { qos: 1 }, () => {
+        pub(c, base + '/up', { from: myId, t: 'm', m: { type: 'join', name: nm, code } });
+      });
+      setTimeout(() => { if (!got) resolve(false); }, 6000);
+    });
+    if (token !== myToken) { c.end(true); return; }
+    if (!found) { c.end(true); continue; }
+    mq = c; roomBase = base; hostSeen = Date.now();
+    $('lobbyMsg').textContent = '';
+    pending.splice(0).forEach(process);
+    // 재접속하면 최신 판 상태를 다시 받아옴
+    c.on('connect', () => { if (c === mq) pub(c, base + '/up', { from: myId, t: 'm', m: { type: 'sync' } }); });
+    hbTimer = setInterval(() => {
+      if (c !== mq) return;
+      pub(c, base + '/up', { from: myId, t: 'ping' });
+      if (Date.now() - hostSeen > DEAD_MS) hostLost('방장과의 연결이 끊어졌어요.');
+    }, 5000);
+    return;
+  }
+  if (token === myToken) $('lobbyMsg').textContent = '방을 찾을 수 없어요. 방장이 나갔거나 코드가 틀렸어요.';
+}
+function hostLost(text) {
+  mq = null; // p2pReset에서 'bye'를 보내지 않도록
+  p2pReset();
+  showLobby();
+  $('lobbyMsg').textContent = text;
+}
+// 다른 앱(카톡 등)에 다녀오면 바로 생존 신호 보내기
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !mq || !roomBase) return;
+  if (core) { if (clients.size) pub(mq, roomBase + '/down', { t: 'alive' }); }
+  else { pub(mq, roomBase + '/up', { from: myId, t: 'ping' }); pub(mq, roomBase + '/up', { from: myId, t: 'm', m: { type: 'sync' } }); }
+});
 
 // ───────── 공통 ─────────
 function send(msg) {
@@ -193,7 +261,7 @@ function send(msg) {
   if (msg.type === 'create') return p2pHost(msg.name);
   if (msg.type === 'join') return p2pJoin(msg.name, String(msg.code || '').toUpperCase().trim());
   if (core) core.message(localConn, msg);
-  else if (hostConn && hostConn.open) hostConn.send(msg);
+  else if (mq && roomBase) pub(mq, roomBase + '/up', { from: myId, t: 'm', m: msg });
   if (msg.type === 'leave') { if (!core) showLobby(); p2pReset(); }
 }
 function name() { const n = $('name').value.trim() || '익명'; localStorage.setItem('omokName', n); return n; }

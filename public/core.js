@@ -169,6 +169,7 @@
           if (text) broadcast(room, { type: 'chat', name: c.name, color: c.color, text });
           break;
         }
+        case 'sync': if (room) sync(room); break;
         case 'leave': leave(c); send(c, { type: 'left' }); break;
       }
     }

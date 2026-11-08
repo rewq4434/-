@@ -34,8 +34,9 @@
 | `android/` | Capacitor 안드로이드 프로젝트 |
 
 ### 연결 방식 두 가지
-- **P2P (기본):** GitHub Pages처럼 서버가 없는 곳에서 써요. 방장의 브라우저가 게임을 진행하고, 상대와는 WebRTC([PeerJS](https://peerjs.com))로 직접 연결해요.
-  - 연결을 맺을 때만 PeerJS의 무료 공개 중계 서버를 써요.
+- **P2P (기본):** GitHub Pages처럼 서버가 없는 곳에서 써요. 방장의 기기가 게임을 진행(`core.js`)하고, 메시지는 무료 공개 MQTT 중계 서버(EMQX, HiveMQ, Mosquitto)로 주고받아요.
+  - WebRTC 직접 연결을 쓰지 않아서 LTE/5G나 회사 와이파이에서도 연결돼요.
+  - 중계 서버 하나가 죽으면 자동으로 다음 서버로 넘어가요. 목록은 `config.js`의 `OMOK_BROKERS`로 바꿀 수 있어요.
 - **서버 모드:** `npm install && npm start`로 Node 서버를 띄워 접속하면 자동으로 이 방식이 돼요. 방장이 나가도 방이 유지되고, 「아무나와 빠른 대전」도 쓸 수 있어요. Render 같은 Node 호스팅에 올리면 돼요(`render.yaml` 포함).
 
 ### GitHub Pages 배포

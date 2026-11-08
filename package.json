@@ -17,8 +17,8 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/cli": "^8.6.0",
     "@capacitor/core": "^8.6.0",
-    "peer": "^1.0.2",
-    "peerjs": "^1.5.5"
+    "aedes": "^0.51.3",
+    "mqtt": "^5.16.1"
   },
   "engines": {
     "node": ">=18"
